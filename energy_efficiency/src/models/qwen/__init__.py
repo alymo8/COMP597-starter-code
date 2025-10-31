@@ -1,1 +1,1 @@
-from src.models.qwen.qwen_small import qwen_init
+from src.models.qwen.qwen_moe import qwen_init

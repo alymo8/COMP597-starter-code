@@ -34,10 +34,6 @@ class ConfigArgs(enum.Enum):
     RUN_NUM = "run_num"  # number of the run used for codecarbon file tracking
     PROJECT_NAME = "project_name"  # name of the project used for codecarbon file tracking
     LEARNING_RATE = "learning_rate"  # learning rate for training
-    ENABLE_THROTTLING = "enable_throttling"
-    EXPERT_THROTTLING_PERFORMANCE_THRESHOLD = "expert_throttling_performance_threshold"
-    THROTTLE_TYPE = "throttle_type"  # (greta) testing unet3d and throttling
-    THROTTLE_FREQUENCY = "throttle_frequency"  # (greta) frequency to set the GPU to during throttling
 
     def to_arg(self) -> str:
         return f"--{self.value}"
@@ -153,14 +149,4 @@ class Config:
 
         self.learning_rate : float = _get_arg(args, ConfigArgs.LEARNING_RATE.value, float)
         """The learning rate for training. It is used by the optimizer for both Switch Transformers and Qwen models."""
-
-        self.enable_throttling : bool = _get_arg(args, ConfigArgs.ENABLE_THROTTLING.value, bool)
-        """Enables GPU frequency throttling at various pre selected points during training."""
-        self.expert_throttling_performance_threshold : float = _get_arg(args, ConfigArgs.EXPERT_THROTTLING_PERFORMANCE_THRESHOLD.value, float)
-        """How much performance can be reduced by throttling."""
-
-        self.throttle_type : str = _get_arg(args, ConfigArgs.THROTTLE_TYPE.value, str)
-        """Which pass to throttle."""
-        self.throttle_frequency : int = _get_arg(args, ConfigArgs.THROTTLE_FREQUENCY.value, int)
-        """The frequency to set the GPU to during the fixed pass when throttling is enabled."""
 

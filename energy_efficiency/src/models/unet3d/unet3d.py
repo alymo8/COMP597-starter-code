@@ -10,7 +10,6 @@ from src.models.unet3d_mlcommons.pytorch.data_loading.data_loader import get_dat
 
 import src.trainer as trainer
 import src.trainer.stats as trainer_stats
-import src.hardware_management as hardware_management
 import src.config as config
 import transformers
 
@@ -159,7 +158,6 @@ def unet3d_mlcommons_trainer(
         num_training_steps=len(train_loader),
     )
 
-    frequency_scheduler = hardware_management.init_scheduler_from_conf(conf, device)
     stats = trainer_stats.init_from_conf(conf=conf, device=device, num_train_steps=len(train_loader))
 
     return trainer.SimpleTrainer(
@@ -169,7 +167,6 @@ def unet3d_mlcommons_trainer(
         lr_scheduler=scheduler,
         device=device,
         stats=stats,
-        frequency_scheduler=frequency_scheduler,
         conf=conf,
     ), None
 

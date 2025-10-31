@@ -1,6 +1,5 @@
 from typing import Dict, Optional, Tuple
 import src.config as config
-import src.hardware_management as hardware_management
 import src.trainer as trainer
 import src.trainer.stats as trainer_stats
 import torch.nn as nn
@@ -59,9 +58,8 @@ def simple_trainer(conf : config.Config, model : transformers.SwitchTransformers
         num_warmup_steps=0,
         num_training_steps=len(loader), 
     )
-    frequency_scheduler = hardware_management.init_scheduler_from_conf(conf, model.device)
 
-    return trainer.SimpleTrainer(loader=loader, model=model, optimizer=optimizer, lr_scheduler=scheduler, device=model.device, stats=trainer_stats.init_from_conf(conf=conf, device=model.device, num_train_steps=len(loader)), frequency_scheduler=frequency_scheduler), None
+    return trainer.SimpleTrainer(loader=loader, model=model, optimizer=optimizer, lr_scheduler=scheduler, device=model.device, stats=trainer_stats.init_from_conf(conf=conf, device=model.device, num_train_steps=len(loader))), None
 
 ################################################################################
 ##################################    Init    ##################################

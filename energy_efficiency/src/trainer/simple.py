@@ -1,12 +1,10 @@
-from typing import Any, Dict, Optional, Tuple
-import src.hardware_management as hardware_management
+from typing import Any, Dict, Optional
 import src.trainer.base as base
 import src.trainer.stats as stats
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
-import time #test
 
 class SimpleTrainer(base.Trainer):
     """Trainer for a simple iteration.
@@ -55,9 +53,8 @@ class SimpleTrainer(base.Trainer):
                  lr_scheduler : optim.lr_scheduler.LRScheduler, 
                  device : torch.device, 
                  stats : stats.TrainerStats,
-                 frequency_scheduler : hardware_management.Scheduler = hardware_management.NOOPScheduler(),
                  conf: Optional[base.config.Config] = None):
-        super().__init__(model, loader, device, stats, frequency_scheduler)
+        super().__init__(model, loader, device, stats)
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.conf = conf

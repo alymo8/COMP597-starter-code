@@ -60,14 +60,7 @@ def get_args() -> argparse.Namespace:
     
     # The default is set to 1e-6 which is a good default rate for training Qwen models. 1e-7 is a good default rate for Switch-Transformers. Make sure to adjust it for different models
     parser.add_argument(config.ConfigArgs.LEARNING_RATE.to_arg(), type=float, help="The learning rate for training. It is used by the optimizer for both Switch Transformers and Qwen models.", default=1e-6)
-
-    # For GPU throttling
-    parser.add_argument(config.ConfigArgs.ENABLE_THROTTLING.to_arg(), action="store_true", help="Whether to use GPU throttling to reduce energy consumption at pre-selected points during training.")
-    parser.add_argument(config.ConfigArgs.EXPERT_THROTTLING_PERFORMANCE_THRESHOLD.to_arg(), type=float, help="How much performance can be reduced by thottling. For example, a value of 0.05 means can throttling can increase computation time by at most 5%.", default=0.02)
-    # (greta) testing unet3d and throttling
-    parser.add_argument(config.ConfigArgs.THROTTLE_TYPE.to_arg(), type=str, help="Which pass to throttle.", choices=["forward", "backward", "optimizer", "all_fixed", "dym_best"], default="optimizer")
-    parser.add_argument(config.ConfigArgs.THROTTLE_FREQUENCY.to_arg(), type=int, help="The frequency to set the GPU to during the fixed pass when throttling is enabled.", default=1305)
-
+    
     # return parser.parse_args()
     # Using parse_known_args since deepspeed adds the flag --local-rank, which is currently unhandled
     args, _ = parser.parse_known_args()

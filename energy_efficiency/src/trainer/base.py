@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Tuple
 from src.trainer.stats.utils import RunningEnergy
-import src.hardware_management as hardware_management
 import src.trainer.stats as stats
 import src.trainer.utils as utils
 import torch
@@ -28,8 +27,6 @@ class Trainer(ABC):
         An object to gather statistics during training. It is an optional 
         parameter. The default `NOOPTrainerStats` will simply no-op on every 
         call used to gather statistical data.
-    frequency_scheduler
-        The `Scheduler` object used to modulate the GPU's frequency.
     checkpoint_frequency
         The after how many steps a checkpoint is saved.
 
@@ -43,8 +40,6 @@ class Trainer(ABC):
         The device on which the model resides and where batches will be moved to.
     stats : src.trainer.stats.TrainerStats
         The `TrainerStats` object used to gather statistics.
-    frequency_scheduler : src.hardware_management.Scheduler
-        The `Scheduler` object used to modulate the GPU's frequency.
     checkpoint_frequency : int
         The after how many steps a checkpoint is saved.
 
@@ -55,29 +50,14 @@ class Trainer(ABC):
                  loader : data.DataLoader, 
                  device : torch.device, 
                  stats : stats.TrainerStats = stats.NOOPTrainerStats(), 
-                 frequency_scheduler : hardware_management.Scheduler = hardware_management.NOOPScheduler(),
                  enable_checkpointing : bool = False,
-                 checkpoint_frequency : int = 1,
-                 conf: Optional[config.Config] = None):
+                 checkpoint_frequency : int = 1):
         self.model = model
         self.loader = loader
         self.device = device
         self.stats = stats
-        self.frequency_scheduler = frequency_scheduler
         self.enable_checkpointing = enable_checkpointing
         self.checkpoint_frequency = checkpoint_frequency
-        self.conf = conf
-
-    # TODO(Olivier): Consider adding parameters to allow configurations of the workloads
-    def register_frequency_scheduler_workloads(self) -> None:
-        """Register the frequency scheduler that will be used.
-
-        The purpose is to provide and extendable method to register all the 
-        frequency scheduler workloads that will be used. Children class can 
-        override it to add workloads.
-        """
-        self.frequency_scheduler.register_workload(utils.TrainingComponents.OPTIMIZER_STEP.value)
-        self.frequency_scheduler.register_workload(utils.TrainingComponents.SAVE_CHECKPOINT.value)
 
     def should_save_checkpoint(self, i : int) -> bool:
         """Condition to device when to save a checkpoint.
@@ -231,50 +211,17 @@ class Trainer(ABC):
             model_kwargs = {}
         batch = self.process_batch(i, batch)
 
-        throttle_type = self.conf.throttle_type if self.conf is not None and self.conf.enable_throttling else None
-        throttle_frequency = self.conf.throttle_frequency if self.conf is not None and self.conf.enable_throttling else None
-
-        # (greta) throttling tests for unet3d 
-        if throttle_type == "all_fixed":
-            print(f"[GRETA LOG] Setting fixed frequency for all training steps")
-            self.frequency_scheduler.schedule_throttling(frequency=throttle_frequency, workload_name=utils.TrainingComponents.ALL_FIXED.value) 
-
         self.stats.start_forward()
-        if throttle_type == "forward":
-            print(f"[GRETA LOG] Throttling during forward pass")
-            self.frequency_scheduler.schedule_throttling(workload_name=utils.TrainingComponents.FORWARD.value)
-        if throttle_type == "dym_best":
-            print(f"[GRETA LOG] Throttling during forward pass - DYM BEST")
-            self.frequency_scheduler.schedule_throttling(frequency=1335, workload_name=utils.TrainingComponents.FORWARD.value)
         loss = self.forward(i, batch, model_kwargs)
-        if throttle_type == "forward" or throttle_type == "dym_best":
-            self.frequency_scheduler.schedule_reset(workload_name=utils.TrainingComponents.FORWARD.value)
         self.stats.stop_forward()
 
         self.stats.start_backward()
-        if throttle_type == "backward":
-            print(f"[GRETA LOG] Throttling during backward pass")
-            self.frequency_scheduler.schedule_throttling(workload_name=utils.TrainingComponents.BACKWARD.value)
-            if throttle_type == "dym_best":
-                self.frequency_scheduler.schedule_throttling(frequency=1305, workload_name=utils.TrainingComponents.BACKWARD.value)
         self.backward(i, loss)
-        if throttle_type == "backward" or throttle_type == "dym_best":
-            self.frequency_scheduler.schedule_reset(workload_name=utils.TrainingComponents.BACKWARD.value)
         self.stats.stop_backward()
 
         self.stats.start_optimizer_step()
-        if throttle_type == "optimizer":
-            print(f"[GRETA LOG] Throttling during optimizer step")
-            self.frequency_scheduler.schedule_throttling(workload_name=utils.TrainingComponents.OPTIMIZER_STEP.value)
-        if throttle_type == "dym_best":
-            self.frequency_scheduler.schedule_throttling(frequency=1417, workload_name=utils.TrainingComponents.OPTIMIZER_STEP.value)
         self.optimizer_step(i)
-        if throttle_type == "optimizer" or throttle_type == "dym_best":
-            self.frequency_scheduler.schedule_reset(workload_name=utils.TrainingComponents.OPTIMIZER_STEP.value)
         self.stats.stop_optimizer_step()
-
-        if throttle_type == "all_fixed":
-            self.frequency_scheduler.schedule_reset(workload_name=utils.TrainingComponents.ALL_FIXED.value)
         
         return loss, None
 
@@ -319,9 +266,7 @@ class Trainer(ABC):
             if self.enable_checkpointing and self.should_save_checkpoint(i):
                 self.stats.start_save_checkpoint()
                 checkpoint_energy.start()
-                self.frequency_scheduler.schedule_throttling(workload_name=utils.TrainingComponents.SAVE_CHECKPOINT.value)
                 self.save_checkpoint(i)
-                self.frequency_scheduler.schedule_reset(workload_name=utils.TrainingComponents.SAVE_CHECKPOINT.value)
                 checkpoint_energy.stop()
                 self.stats.stop_save_checkpoint()
                 print(f"checkpoint energy consumption: {checkpoint_energy.get_last()}")
@@ -341,4 +286,3 @@ class Trainer(ABC):
         self.stats.stop_train()
         progress_bar.close()
         self.stats.log_stats()
-        self.frequency_scheduler.stop()
