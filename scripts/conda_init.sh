@@ -6,12 +6,12 @@ then
 fi
 
 __conda_setup="$('conda' 'shell.bash' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
 	echo "Failed to obtain conda init hook."
 	exit 1
 fi
 eval "$__conda_setup"
-if [ $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
 	echo "Failed to initialize conda."
 	exit 1
 fi
