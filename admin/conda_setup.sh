@@ -16,7 +16,7 @@ conda create --prefix=${COMP597_CONDA_ENV_PREFIX} python=${COMP597_CONDA_ENV_PYT
 . ${SETUP_SCRIPTS_DIR}/../scripts/conda_init.sh
 conda activate ${COMP597_CONDA_ENV_PREFIX}
 
-requirements_file=${script_dir}/../requirements.txt
+requirements_file=${SETUP_SCRIPTS_DIR}/../requirements.txt
 
 pip install -r ${requirements_file}
 
