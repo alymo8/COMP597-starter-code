@@ -40,8 +40,6 @@ if [[ $COMP597_JOB_CONFIG_LOG = true ]]; then
 	echo
 fi
 
-exit 0
-
 # Run the job
 
 eval "${COMP597_JOB_COMMAND} $@"
