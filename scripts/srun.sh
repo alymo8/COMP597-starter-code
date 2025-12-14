@@ -23,6 +23,8 @@ module load slurm # Required to have access to SLURM commands.
 
 if [[ $COMP597_SLURM_CONFIG_LOG = true ]]; then
 	env_table "^COMP597_SLURM_" "SLURM Configuration"
+	echo
+	echo
 fi
 
 # Launch the job

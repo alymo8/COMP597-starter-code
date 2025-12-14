@@ -44,4 +44,4 @@ exit 0
 
 # Run the job
 
-${COMP597_JOB_COMMAND} $@
+eval "${COMP597_JOB_COMMAND} $@"
