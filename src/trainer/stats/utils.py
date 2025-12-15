@@ -2,6 +2,8 @@ import pynvml
 import time
 import torch
 
+_TRAINER_STATS_AUTO_DISCOVERY_IGNORE=True
+
 class RunningAverage:
     """Implements a running average.
     

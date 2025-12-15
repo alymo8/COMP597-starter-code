@@ -13,8 +13,8 @@ def _discover_submodules(path : List[str]) -> List[pkgutil.ModuleInfo]:
         logger.debug(f"Found submodule '{submodule.name}' under '{path}'")
     return submodules
 
-def _import_submodule_if_contains_attr(package : str, submodule : pkgutil.ModuleInfo, module_attr_name : str, ignore_attr_name : str = "") -> Optional[ModuleType]:
-    if not submodule.ispkg:
+def _import_submodule_if_contains_attr(package : str, submodule : pkgutil.ModuleInfo, module_attr_name : str, ignore_attr_name : str, strict_ispkg : bool) -> Optional[ModuleType]:
+    if strict_ispkg and not submodule.ispkg:
         return None
     try:
         module = importlib.import_module(name=f".{submodule.name}", package=package)
@@ -38,11 +38,11 @@ def _register_module(found : Dict[str, object], module : ModuleType, module_attr
     found[name] = getattr(module, module_attr_name)
     return found
 
-def register(package : str, path : List[str], module_attr_name : str, name_override_attr_name : str = "", ignore_attr_name : str = "") -> Dict[str, object]:
+def register(package : str, path : List[str], module_attr_name : str, name_override_attr_name : str = "", ignore_attr_name : str = "", strict_ispkg : bool = True) -> Dict[str, object]:
     submodules = _discover_submodules(path)
     found = {}
     for submodule in submodules:
-        module = _import_submodule_if_contains_attr(package, submodule, module_attr_name, ignore_attr_name)
+        module = _import_submodule_if_contains_attr(package, submodule, module_attr_name, ignore_attr_name, strict_ispkg)
         if module is None:
             logger.debug(f"Found submodule '{submodule.name}' but it did not have the '{module_attr_name}' attribute.")
             continue

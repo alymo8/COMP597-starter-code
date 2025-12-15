@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Tuple
-from src.trainer.stats.utils import RunningEnergy
 import src.trainer.stats as stats
 import torch
 import torch.nn as nn

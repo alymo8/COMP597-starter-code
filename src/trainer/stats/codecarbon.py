@@ -1,33 +1,33 @@
-import os
-import csv
-import pandas as pd
-import src.trainer.stats.base as base
-import src.trainer.stats.utils as utils
-import torch
-
-import codecarbon
 from codecarbon import track_emissions, EmissionsTracker, OfflineEmissionsTracker
 from codecarbon.core.util import backup
 from codecarbon.external.logger import logger
 from codecarbon.output_methods.base_output import BaseOutput
 from codecarbon.output_methods.emissions_data import EmissionsData, TaskEmissionsData
+from typing import List
+import codecarbon
+import codecarbon.core.cpu 
+import logging
+import os
+import csv
+import pandas as pd
+import src.config as config
+import src.trainer.stats.base as base
+import torch
+
+logger = logging.getLogger(__name__)
 
 # artificially force psutil to fail, so that CodeCarbon uses constant mode for CPU measurements
-import codecarbon.core.cpu 
 codecarbon.core.cpu.is_psutil_available = lambda: False
 
-from typing import List
+trainer_stats_name="codecarbon"
 
-
-"""
-Provides energy consumed and carbon emitted during model training. 
-
-This class measures the energy consumption and carbon emissions of the forward pass, backward pass, 
-and optimiser step, as well as of the training as a whole.
-
-Implemented using the CodeCarbon library: https://mlco2.github.io/codecarbon/.
-
-"""
+def construct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats:
+    if "device" in kwargs:
+        device = kwargs["device"]
+    else:
+        logger.warning("No device provided to codecarbon trainer stats. Using default PyTorch device")
+        device = torch.get_default_device() 
+    return CodeCarbonStats(device, conf.trainer_stats_configs.codecarbon.run_num, conf.trainer_stats_configs.codecarbon.project_name)
 
 class SimpleFileOutput(BaseOutput): 
     
@@ -128,6 +128,26 @@ class SimpleFileOutput(BaseOutput):
         df.to_csv(save_task_file_path, index=False)
 
 class CodeCarbonStats(base.TrainerStats):
+    """Provides energy consumed and carbon emitted during model training. 
+    
+    This class measures the energy consumption and carbon emissions of the 
+    forward pass, backward pass, and optimiser step, as well as of the training 
+    as a whole.
+
+    Implemented using the CodeCarbon library: 
+    https://mlco2.github.io/codecarbon/.
+
+    Parameters
+    ----------
+    device
+        A PyTorch device which will be the targets of the measurements.
+    run_num
+        Used to number different experiments in case their measurements get 
+        merged into a single file.
+    project_name
+        Used by CodeCarbon to identify the experiments. 
+
+    """
 
     def __init__(self, device : torch.device, run_num : int, project_name : str) -> None: 
         
@@ -234,10 +254,10 @@ class CodeCarbonStats(base.TrainerStats):
         self.training_substep_tracker.stop_task(task_name = f"Optimisation step #{self.iteration}")
 
     def start_save_checkpoint(self) -> None:
-        print("[WARN] start_save_checkpoint is not implemented.")
+        logger.warning(f"Method 'start_save_checkpoint' is not implemented for '{self.__class__.__name__}'.")
 
     def stop_save_checkpoint(self) -> None:
-        print("[WARN] stop_save_checkpoint is not implemented.")
+        logger.warning(f"Method 'stop_save_checkpoint' is not implemented for '{self.__class__.__name__}'.")
 
     def log_step(self) -> None:
         pass
@@ -257,7 +277,7 @@ class CodeCarbonStats(base.TrainerStats):
         )
         df.to_csv(save_file_path, index=False)
 
-        print(f"\n CODECARBON LOSS LOGGING: Rank {gpu_id} - Run {self.run_num} - Losses saved to {save_file_path}")
+        logger.info(f"CODECARBON LOSS LOGGING: Rank {gpu_id} - Run {self.run_num} - Losses saved to {save_file_path}")
 
     def log_loss(self, loss: torch.Tensor) -> None:
         """
@@ -269,6 +289,4 @@ class CodeCarbonStats(base.TrainerStats):
                 "loss": loss.to(torch.device("cpu"), non_blocking=True),
             }
         )
-        
-        # print for debugging and tracking purposes
-        print(f"\n CODECARBON LOSS LOGGING: Step {self.iteration} - Loss: {loss:.4f}")
+

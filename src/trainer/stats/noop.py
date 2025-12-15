@@ -1,5 +1,11 @@
+import src.config as config
 import src.trainer.stats.base as base
 import torch
+
+trainer_stats_name="noop"
+
+def construct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats:
+    return NOOPTrainerStats()
 
 class NOOPTrainerStats(base.TrainerStats):
     """NOOP Trainer stats to ignore data accumulation.

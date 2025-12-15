@@ -1,6 +1,20 @@
+import logging
+import src.config as config
 import src.trainer.stats.base as base
 import src.trainer.stats.utils as utils
 import torch
+
+logger = logging.getLogger(__name__)
+
+trainer_stats_name="simple"
+
+def contruct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats:
+    if "device" in kwargs:
+        device = kwargs["device"]
+    else:
+        logger.warning("No device provided to simple trainer stats. Using default PyTorch device")
+        device = torch.get_default_device()
+    return SimpleTrainerStats(device=device)
 
 class SimpleTrainerStats(base.TrainerStats):
     """Provides simple timing measurements of training.

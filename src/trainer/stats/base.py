@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import torch
 
+_TRAINER_STATS_AUTO_DISCOVERY_IGNORE=True
+
 class TrainerStats(ABC):
     """Abstract class used by trainers to accumulate statistics.
 
