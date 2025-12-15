@@ -18,6 +18,7 @@ import torch.utils.data
 _MODEL_INIT_FUNCTION_NAME = "init_model"
 _MODEL_NAME_VARIABLE_NAME = "model_name"
 _MODELS = auto_discovery.register(
+    package=__package__,
     path=list(__path__), 
     module_attr_name=_MODEL_INIT_FUNCTION_NAME, 
     allow_name_override=True, 
