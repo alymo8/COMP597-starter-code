@@ -1,13 +1,13 @@
 # COMP597-starter-code
-This repository contains starter code for COMP597: Responsible AI - Energy Efficiency analysis using CodeCarbon. 
+This repository contains starter code for COMP597: Sustainability in Systems Design - Energy Efficiency analysis using CodeCarbon. 
 TODO: add more description on for course description, project description and instructions on the project.
-### Course Description
+## Course Description
 TODO: course description.
 
-### Project Description
+## Project Description
 TODO: project description.
 
-#### Models
+### Models
 
 | Model Name | Type | Architecture | Size | Documentation | Dataset | Pretrained Weights | Notes |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -43,66 +43,76 @@ TODO: instructions for the project. eg:
 
 ---
 
-### Repository Structure
+## Repository Structure
 ```
 COMP597-starter-code
 .
-├── energy_efficiency
-│   ├── src
-│   │   ├── config                          # Configuration related files                     
-│   │   ├── models
-│   │   │   ├── gpt2
-│   │   │   └── ...                 
-│   │   ├── trainer                         
-│   │   │   ├── stats                       # Stats collection for trainers
-│   │   │   │  ├── base.py 
-│   │   │   │  └── ...
-│   │   │   ├── base.py                     # Trainer base class
-│   │   └── ...   
-│   ├── launch.py                           # Main script to launch training experiments                           
-│   ├── requirements.txt                        
-│   └── start-gpt2.sh
-├── .gitignore
-├── env_setup.sh                            # Script to setup the conda environment                               
-└── README.md
-``` 
+├── README.md 
+├── config                              # Bash configurations to run the code
+├── launch.py                           # Entrypoint to run training experiments
+├── requirements.txt
+├── scripts
+│   └── env_setup.sh                    # Script to setup local conda environment
+└── src
+    ├── auto_discovery 
+    ├── config                          # Configurations objects used to structure program inputs
+    │   ├── config.py                   # Root config class containing all sub-configs
+    │   ├── data                        # Sub-configs to load datasets
+    │   ├── models                      # Sub-configs for models
+    │   ├── trainer_stats               # Sub-configs to configure data measurements
+    │   ├── trainers                    # Sub-configs to configure the trainers
+    │   └── util                        # Utilities to create config objects
+    ├── data                            # Module to load datasets
+    │   ├── dataset                     # Thin wrapper around HF datasets module
+    │   └── ...
+    ├── models                          # Module to create models
+    │   ├── gpt2                        # GPT2 example
+    │   └── ...
+    └── trainer                         # Module providing trainer classes that can train models
+        ├── base.py                     # Abstract class defining the interface for trainer classes
+        ├── simple.py                   # Simple 
+        ├── ...
+        └── stats                       # Module providing measurements classes for trainers
+            ├── base.py                 # Abstract class defining the interface for measurement classes
+            └── ...
+```
 
-##### On a high level, the execution flow follows this structure:
-1. **Entry point**: `launch.py`: file acts as the main entry point for training. It parses command-line arguments (into a configuration object conf), prepares the dataset, and then initialises the trainer object that will be used to train the model via process_conf(): `model_trainer, model_kwards = process_conf(conf, dataset)`. Internally, `process_conf()` calls the set-up funciton o fth emodel specified in the configuration object. For example, if `conf.model == "gpt2"`, it calls `gpt2.init_from_conf(conf, dataset)`. The `launch.py` file then receives back a Trianer instance and any model-specific keyword arguments. Finally, it calls the `train()` method of the Trainer instance to start training.
-2. **Model setup**: `src/models/<model_name>/<model_name>.py`: Each model has its own directory under `src/models/`. The setup function `<model_name>_init(...)` is defined for each model under `src/models/`. For example, ``gpt2_init(...)` is defined under `src/models/gpt2/gpt2.py`. This `init()` function starts by handling all the ocmmon initialization steps for the model, such as loading the tokenizer, model configuration, and data collator. It then calls a trainer-specific setup function (e.g., `simple_trainer(...)`) based on the CLI arguments passed to initialize the trainer object with the model, dataset, optimizer, and other components.
-3. **Trainer construction**: Each of these setup `init()` functions conclude by returning an instance of a Trainer class (defined under `src/trainer/`) that encapsulates the training logic. The Trainer class is responsible for managing the training loop, including forward and backward passes, optimization steps, and stats collection. In other words, the functinos inside the model classes set up the model with all the parameters needed for training (the tokens, the model, the backend connections with hardware, etc), then use these parameters to create a new Trainer object of matching type. It is this Trainer object which is then called on to actually begin the training. 
+### On a high level, the execution flow follows this structure:
+1. **Entry point**: `launch.py`: file acts as the main entry point for training. It parses command-line arguments (into a configuration object conf), and then initialises the trainer object that will be used to train the model via process_conf(): `model_trainer, model_kwards = process_conf(conf)`. Internally, `process_conf()` calls the set-up funciton of the model specified in the configuration object. For example, if `conf.model == "gpt2"`, it calls `gpt2.init_model(conf)`. The `launch.py` file then receives back a Trianer instance and any model-specific keyword arguments. Finally, it calls the `train()` method of the Trainer instance to start training.
+2. **Model setup**: `src/models/<model_name>/<model_name>.py`: Each model has its own directory under `src/models/`. The setup function `init_model(...)` is defined for each model under `src/models/<model_name>/__init__.py`. This `init_model()` function starts by handling all the common initialization steps for the model, such as loading the tokenizer, model configuration, and data collator. It then calls a trainer-specific setup function (e.g., `simple_trainer(...)`) based on the CLI arguments passed to initialize the trainer object with the model, dataset, optimizer, and other components.
+3. **Trainer construction**: Each of these setup `init_model()` functions conclude by returning an instance of a Trainer class (defined under `src/trainer/`) that encapsulates the training logic. The Trainer class is responsible for managing the training loop, including forward and backward passes, optimization steps, and stats collection. In other words, the functions inside the model classes set up the model with all the parameters needed for training (the tokens, the model, the backend connections with hardware, etc), then use these parameters to create a new Trainer object of matching type. It is this Trainer object which is then called on to actually begin the training. 
 4. **Trainer execution**: Back in `launch.py`, the returned Trainer object is used to start the training process by calling its `train()` method. This method encapsulates the full training loop: iterating over batches, running forward and backward passes, stepping the optimizer, and calling the appropriate statistics hooks (e.g. timers, profilers, or energy tracking via CodeCarbon).
 
-##### A closer look at the Trainer class:
+### A closer look at the Trainer class:
 - The *Trainer* class is defined under `src/trainer/base.py` as an abstract base class. It defines the basic structure and methods that all trainer implementations must follow. It establishes the general structure of the training loop. It contains two core concrete methods:
     - `train(self, kwargs)`: iterates over every batch in the dataset. For every batch, triggers the training step logic (forward pass, backward pass, and optimiser step) by calling self.step().
-    - `step(iteration_num, batch, model_kwargs)`: given a batch of data, performs one iteration step. This is a template method, and it delegates the actual forward pass, backward pass and optimiser step to abstract classes forward(), backward(), and optimizer_step(). The step() method combines the steps that are common to all trainers, such as loading the batch or calling the stats trackers.
-    - The abstract classes forward(), backward(), and optimizer_step() are left to be implemented by each concrete subclass of Trainer. This separation allows the train() and step() methods to stay identical for all trainer types, while each concrete subclass defines its own way of running a batch through the system via its custom implementation of the the forward pass, backward pass and optimiser step. 
+    - `step(iteration_num, batch, model_kwargs)`: given a batch of data, performs one iteration step. This is a template method, and it delegates the actual forward pass, backward pass and optimiser step to abstract classes `forward()`, `backward()`, and `optimizer_step()`. The `step()` method combines the steps that are common to all trainers, such as loading the batch or calling the stats trackers.
+    - The abstract classes `forward()`, `backward()`, and `optimizer_step()` are left to be implemented by each concrete subclass of Trainer. This separation allows the `train()` and `step()` methods to stay identical for all trainer types, while each concrete subclass defines its own way of running a batch through the system via its custom implementation of the the forward pass, backward pass and optimiser step. 
     - The Trainer subclasses currently implemented are:
         - `SimpleTrainer` (defined under `src/trainer/simple_trainer.py`): a basic trainer used for single-GPU that implements the abstract methods of Trainer with straightforward logic for forward pass, backward pass, and optimiser step.
         - Additional trainers can be added as needed by creating new subclasses of Trainer and implementing the required abstract methods.
 - The *TrainerStats* class is defined under `src/trainer/stats/base.py` as an abstract base class for collecting and reporting statistics during training. It defines methods that are called at various points in the training loop to track metrics such as loss, accuracy, time taken, and energy consumption. It defines a set of hooks that the trainers can call to measure and log what's happening at different phases of the training. The base class contains the following abstract methods at increasing levels of granularity, where every trainer calls these hooks before and after each different phase of training, allowing the trackers to record metrics like time, energy consumption, traces, and more. This makes it easy to add a new tracker: just extend the base class TrainerStats, and meanwhile the integration with the trainers is already done:
-    - start_train(), stop_train(): track the full training period
-    - start_step(), stop_step(): track the full training step for one batch
-    - start_forward(), stop_forward(): track the forward pass 
-    - start_backward(), stop_backward(): track the backward pass 
-    - start_optimiser_step(), stop_optimiser_step(): track the optimiser step 
-    - log_step(), log_stats(): log the collected statistics at each step and at the end of training
+    - `start_train()`, `stop_train()`: track the full training period
+    - `start_step()`, `stop_step()`: track the full training step for one batch
+    - `start_forward()`, `stop_forward()`: track the forward pass 
+    - `start_backward()`, `stop_backward()`: track the backward pass 
+    - `start_optimiser_step()`, `stop_optimiser_step()`: track the optimiser step 
+    - `log_step()`, `log_stats()`: log the collected statistics at each step and at the end of training
 - Avalible TrainerStats subclasses:
     - `NOOPTrainerStats` (defined under `src/trainer/stats/noop.py`): a no-operation stats tracker that does nothing. It leaves all methods blank. Dummy default that doesn't track anything.
-    - `SimpleTrainerStats` (defined under `src/trainer/stats/simple.py`): a basic stats tracker that measures time taken for each phase and logs loss at each step. It measures how much time each phase of the training loop takes. It uses torch.cuda.synchronize() to ensure CUDA timings are accurate, and stores each measurement using a helper called RunningTimer from utils.py. At the end of each training step it prints how long each subphase took (forward, backward & optimiser step), and at the end of training, it prints a breakdown of averages and quantiles.
+    - `SimpleTrainerStats` (defined under `src/trainer/stats/simple.py`): a basic stats tracker that measures time taken for each phase and logs loss at each step. It measures how much time each phase of the training loop takes. It uses torch.cuda.synchronize() to ensure CUDA timings are accurate, and stores each measurement using a helper called RunningTimer from `utils.py`. At the end of each training step it prints how long each subphase took (forward, backward & optimiser step), and at the end of training, it prints a breakdown of averages and quantiles.
     - `CodeCarbonStats` (defined under `src/trainer/stats/codecarbon.py`): a stats tracker that integrates with the CodeCarbon library to measure energy consumption during training. It measure the energy consumption and CO2 emissions associated with different phases of training: the full training loop, individual training steps, and passes within training steps (forward, backward, optimiser). Outputs the data in a csv file. Implemented using CodeCarbon's OfflineEmissionsTracker class.
     - Additional stats trackers can be added as needed by creating new subclasses of TrainerStats and implementing the required abstract methods.
 
-### External Resources
+## External Resources
 ### CodeCarbon Resources
 - [CodeCarbon Colab Tutorial](https://colab.research.google.com/drive/1eBLk-Fne8YCzuwVLiyLU8w0wNsrfh3xq)
 
 ---
 
-### Environment setup
+## Environment setup
 
-We will use a Conda envrionment to install the required dependencies. The steps below will walk you through the steps. A setup script `env_setup.sh` is also provided and will execute all the steps below given as input the path `SOME_PATH` as described in step one below.
+We will use a Conda envrionment to install the required dependencies. The steps below will walk you through the steps of setting up a local Conda environment if you wish to use one. On the SLURM node, you will be provided with an environment. A setup script `scripts/env_setup.sh` is also provided and will execute all the steps below given as input the path `SOME_PATH` as described in step one below.
 
 1. **Setting up storage** <br> Your home directory on the McGill server is part of a network file system where users get limited amounts of storage. You can check your storage usage and how much you are allowed to use using the command `quota`. Python packages, pip's cache, Conda's cache and datasets can use quite a bit of storage, so we need to ensure they are stored outside your directory to avoid any issues with disk quotas. Say you have your own directory, stored in `SOME_PATH`, on a server that is not part of the network file system (hence not affected by disk quotas). Use `export BASE_STORAGE_PATH=SOME_PATH` where you replace `SOME_PATH` with the actual path. The steps to go around the disk quota are as follows:
     1. We can make a cache directory using `mkdir ${BASE_STORAGE_PATH}/cache`. 
@@ -125,9 +135,8 @@ We will use a Conda envrionment to install the required dependencies. The steps 
 
 ---
 
-TODO: FINSIH section about how to use the codebase, with GPT2 as an example + instructions on how to add new models.
-### GPT2 example
-#### How to setup a new model (GPT2)
+## GPT2 example
+### How to setup a new model (GPT2)
 Files to edit/add:
 - Add a new model under the [models](energy_efficiency/src/models/) directory; `energy_efficiency/src/models/gpt2/gpt2.py` : contains the GPT2 model definition, optimizer initialization, and trainer setup.
 - Create a bash script to run the experiments (optional); `energy_efficiency/start-gpt2.sh` : script to launch experiments with GPT2 model.
