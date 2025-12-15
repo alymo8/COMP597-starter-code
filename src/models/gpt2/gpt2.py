@@ -44,7 +44,7 @@ def process_dataset(conf: config.Config, tokenizer: transformers.PreTrainedToken
     """
     def tokenize(examples):
         return tokenizer(examples["text"], max_length=512, padding="max_length", truncation=True, return_tensors="pt") 
-    dataset = dataset.map(tokenize, batched=True, num_proc=conf.tokenize_num_process) # Tokenize the dataset
+    dataset = dataset.map(tokenize, batched=True, num_proc=conf.model_configs.gpt2.tokenize_num_process) # Tokenize the dataset
     dataset = dataset.remove_columns(column_names=["text", "url", "timestamp"]) # Remove unnecessary columns
     return dataset
 
