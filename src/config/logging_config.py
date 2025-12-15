@@ -5,7 +5,7 @@ class DefaultLoggingConfig:
 
     def __init__(self) -> None:
         self.level : str = "WARNING"
-        self.format : str = "[{levelname:.4}] {asctime} : {filename:<24.24} : {message}"
+        self.format : str = "[{levelname:.4}] : {asctime} : {module:<24.24} : {message}"
         self.datefmt : str = "%Y-%m-%dT%H:%M:%S" # ISO 8601
         self.style : str = '{'
 
