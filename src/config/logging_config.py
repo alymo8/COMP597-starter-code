@@ -1,4 +1,4 @@
-from src.config.base_config import _Arg, _BaseConfig
+from src.config.util.base_config import _Arg, _BaseConfig
 import logging
 
 class DefaultLoggingConfig:

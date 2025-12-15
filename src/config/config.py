@@ -1,6 +1,6 @@
 """This file contains the configurations for the project.
 """
-from src.config.base_config import _Arg, _BaseConfig
+from src.config.util.base_config import _Arg, _BaseConfig
 from src.config.logging_config import LoggingConfig
 from typing import Any, Type, TypeVar
 import argparse
