@@ -36,7 +36,7 @@ def process_conf(conf : config.Config) -> Tuple[trainer.Trainer, Optional[Dict[s
 def get_conf() -> config.NewConfig:
     parser = argparse.ArgumentParser()
 
-    conf = config.NewConfig()
+    conf = config.Config()
     conf.add_arguments(parser)
     
     args, _ = parser.parse_known_args()
