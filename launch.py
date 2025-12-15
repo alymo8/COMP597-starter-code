@@ -45,6 +45,7 @@ def get_conf() -> config.NewConfig:
 
 def main():
     conf = get_conf()
+    setup_logging(conf)
     logger.debug(f"Configuration: {conf}")
     logger.info(f"available models: {models.get_available_models()}")
     model_trainer, model_kwargs = process_conf(conf)
