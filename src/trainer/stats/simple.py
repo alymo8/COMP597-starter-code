@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 trainer_stats_name="simple"
 
-def contruct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats:
+def construct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats:
     if "device" in kwargs:
         device = kwargs["device"]
     else:
