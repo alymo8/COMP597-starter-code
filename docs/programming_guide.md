@@ -2,34 +2,6 @@
 
 This document attemps to provide guidelines to add code in the repository. Make sure to read through it carefully to make it easier to add the code for your project.
 
-## Types
-
-As much as possible, the provided code uses [type annotations](https://typing.python.org/en/latest/spec/annotations.html) on function inputs and outputs, on method inputs and outputs, and sometimes on class attributes as well where relevant. When you will implement your own components in the project, try to do so as well. It makes it easier for everyone who will read or use your code to understand it and use it without error. 
-
-If you are not familiar with what they are, please read the documentation linked above, as well as the typing module [documentation](https://docs.python.org/3/library/typing.html) for more information. You can also see the basics below:
-
-```python
-# Type annotations for a function input:
-def some_func(x : int, y : str, z : bool):
-    pass
-
-# Type annotations for a function output:
-def some_func() -> bool:
-    pass
-
-# You can also use your type/classes
-class Example:
-    def __init__(self):
-        pass
-def some_func(x : Example):
-    pass
-
-# An example for more complex types:
-from typing import Dict, List, Optional, Tuple
-def some_func(x : Dict[str, List]) -> Tuple[Optional[int],...]:
-    pass
-```
-
 ## Auto-discovery
 
 Auto-discovery is the feature that is used so that you can easily add your components to this code without having to change the provided code. Some sections in this documentation will rely on you having read this section, which provides a description of the basic mechanism.
