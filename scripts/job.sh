@@ -2,7 +2,7 @@
 
 # Required paths
 
-SCRIPTS_DIR=$(readlink -f -n $(dirname $0))
+SCRIPTS_DIR=${COMP597_SLURM_SCRIPTS_DIR:-$(readlink -f -n $(dirname $0))}
 REPO_DIR=$(readlink -f -n ${SCRIPTS_DIR}/..)
 
 DEFAULT_CONFIG_FILE=${REPO_DIR}/config/default_job_config.sh
