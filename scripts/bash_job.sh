@@ -5,7 +5,7 @@
 SCRIPTS_DIR=${COMP597_SLURM_SCRIPTS_DIR:-$(readlink -f -n $(dirname $0))}
 REPO_DIR=$(readlink -f -n ${SCRIPTS_DIR}/..)
 
-DEFAULT_CONFIG_FILE=${REPO_DIR}/config/default_job_config.sh
+DEFAULT_CONFIG_FILE=${REPO_DIR}/config/default_bash_job_config.sh
 
 # Load dependencies
 
@@ -48,4 +48,4 @@ fi
 
 # Run the job
 
-eval "${COMP597_JOB_COMMAND} $@"
+eval "$@"

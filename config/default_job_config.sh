@@ -85,6 +85,9 @@ export PIP_CACHE_DIR=${COMP597_JOB_CACHE_DIR}/pip
 # Path to allow Hugging Face's libraries to cache files outside the home 
 # directory. It avoid exceeding the disk quota applied to the home directory.
 export HF_HOME=${COMP597_JOB_CACHE_DIR}/huggingface
+# If non-empty and a valid path, changes the working directory before running 
+# the job command.
+export COMP597_JOB_WORKING_DIRECTORY=""
 # Command to run.
 export COMP597_JOB_COMMAND=${scripts_dir}/launch.sh
 
