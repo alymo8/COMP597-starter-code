@@ -27,8 +27,11 @@ Before digging straight into the code, visit the [documentation](docs/ToC.md). I
 | recursiongfn | [`milabench/benchmarks/recursiongfn`](https://github.com/mila-iqia/milabench/tree/master/benchmarks/recursiongfn) | GFlowNet | Graphs | GFlowNet, T. | 600M | [Paper introducing model](https://arxiv.org/abs/2106.04399), [library used by Milabench](https://github.com/Delaunay/gflownet/tree/milabench) | No dataset as it is a generative task. | Unfortunately, there is no documentation, but the weights are from [here](https://github.com/GFNOrg/gflownet/blob/master/mols/data/pretrained_proxy/best_params.pkl.gz) | It would be best to create a gitsubmodule to import the library they use under `src/models/gflownet/`, or similar.  |
 | whisper | [`milabench/benchmarks/huggingface`](https://github.com/mila-iqia/milabench/tree/master/benchmarks/huggingface) | Whisper | ASR | Transformer | 37.8M | [HuggingFace Documentation](https://huggingface.co/docs/transformers/en/model_doc/whisper) | [Synthetic Dataset from MilaBench](https://github.com/mila-iqia/milabench/blob/master/benchmarks/huggingface/bench/synth.py) | [HuggingFace Whisper Tiny Model Card](https://huggingface.co/openai/whisper-tiny), See how Milabench creates the model [here](https://github.com/mila-iqia/milabench/blob/master/benchmarks/huggingface/bench/models.py) | N/A |
 
----
+### Datasets
 
+Some of the datasets you will be using are larger the storage provided for this course. The reality is that you do not need a full dataset to do energy measurements. A subset allowing for a few hundred or thousand iterations is sufficient to get meaningful results. Remember, we are not measuring the performance of the models, so there is no need to train for a certain accuracy or other metric. 
+
+If you decide to store your dataset on the shared partition (see the provided Slurm [documentation](docs/slurm.md)), **please reduce the size of the dataset to around 5GB (at most 10GB)**. For example, the dataset used in the provided GPT2 example, only contains one file of the C4 dataset. There are various ways to achieve this, and it is dependent on your dataset. Explore the options available! 
 
 ## CodeCarbon Resources
 - [CodeCarbon Colab Tutorial](https://colab.research.google.com/drive/1eBLk-Fne8YCzuwVLiyLU8w0wNsrfh3xq)
