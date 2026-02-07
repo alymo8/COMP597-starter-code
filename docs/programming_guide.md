@@ -38,10 +38,10 @@ src/models/<model_name>
 
 Where `__init__.py` will make sure a function with signature `init_model(conf : src.config.Config, dataset : torch.utils.data.Dataset) -> Tuple[src.trainer.Trainer, Optional[Dict[str, Any]]]` is available and optionally provides a name for your model by setting the variable `model_name` to the desired name. `model.py` contains the basics to initialize your model and creates a trainer for that model. Please take a look at the GPT2 example provided at `src/models/gpt2/`. Once this is done, you will be able to use it with `python3 launch.py --model <model_name>`. In simple steps:
 
-1. Create directory `src/config/models/<model_name>`.
-2. Create file `src/config/models/<model_name>/__init__.py`
-3. Create file `src/config/models/<model_name>/model.py`
-4. Add the following to `src/config/models/<model_name>/__init__.py`
+1. Create directory `src/models/<model_name>`.
+2. Create file `src/models/<model_name>/__init__.py`
+3. Create file `src/models/<model_name>/model.py`
+4. Add the following to `src/models/<model_name>/__init__.py`
    ```python
    # === import necessary modules ===
    import src.models.<model_name>.model
@@ -57,7 +57,7 @@ Where `__init__.py` will make sure a function with signature `init_model(conf : 
    def init_model(conf : config.Config, dataset : data.Dataset) -> Tuple[trainer.Trainer, Optional[Dict[str, Any]]]:
        pass
    ```
-5. Write your code in `src/config/models/<model_name>/model.py`.
+5. Write your code in `src/models/<model_name>/model.py`.
 6. Complete the implementation of `init_model(...)`
 
 If your model needs specific configurations that should be provided by the config object provided to the init method, see the [relevant documentation](#additional-models-configurations).
