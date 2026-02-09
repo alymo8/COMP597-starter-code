@@ -1,4 +1,8 @@
 import logging
+import csv
+import json
+import os
+import time
 from typing import Dict, Optional
 
 import src.config as config
@@ -43,48 +47,124 @@ class ResourceTrainerStats(base.TrainerStats):
         self.include_gpu = bool(int(getattr(cfg, "include_gpu", 1)))
         self.include_system = bool(int(getattr(cfg, "include_system", 1)))
         self.include_process = bool(int(getattr(cfg, "include_process", 1)))
+        self.include_cpu = bool(int(getattr(cfg, "include_cpu", 1)))
         self.include_io = bool(int(getattr(cfg, "include_io", 1)))
+        self.include_energy = bool(int(getattr(cfg, "include_energy", 1)))
+        self.include_torch_cuda_memory = bool(int(getattr(cfg, "include_torch_cuda_memory", 1)))
+        self.carbon_intensity_gco2_per_kwh = float(getattr(cfg, "carbon_intensity_gco2_per_kwh", 40.0))
         self.gpu_index = int(getattr(cfg, "gpu_index", -1))
+        self.output_dir = str(getattr(cfg, "output_dir", "."))
+        self.output_file_prefix = str(getattr(cfg, "output_file_prefix", "resource_stats"))
+        self.step_csv_path = os.path.join(self.output_dir, f"{self.output_file_prefix}_steps.csv")
+        self.summary_json_path = os.path.join(self.output_dir, f"{self.output_file_prefix}_summary.json")
 
         # Stats containers
         self.gpu_util = utils.RunningStat()
         self.gpu_mem_used = utils.RunningStat()
         self.gpu_mem_total = utils.RunningStat()
+        self.gpu_power_w = utils.RunningStat()
+        self.gpu_energy_mj = utils.RunningStat()
+        self.step_energy_kwh = utils.RunningStat()
+        self.step_carbon_gco2 = utils.RunningStat()
         self.sys_mem_used = utils.RunningStat()
         self.sys_mem_total = utils.RunningStat()
         self.proc_rss = utils.RunningStat()
         self.proc_vms = utils.RunningStat()
+        self.sys_cpu_percent = utils.RunningStat()
+        self.proc_cpu_percent = utils.RunningStat()
         self.proc_io_read = utils.RunningStat()
         self.proc_io_write = utils.RunningStat()
+        self.step_duration_ms = utils.RunningStat()
+        self.torch_cuda_allocated_mib = utils.RunningStat()
+        self.torch_cuda_reserved_mib = utils.RunningStat()
 
         self._process = None
         self._prev_io = None
         self._nvml_ready = False
         self._nvml_handle = None
+        self._prev_total_energy_mj = None
+        self._cumulative_energy_kwh = 0.0
+        self._cumulative_carbon_gco2 = 0.0
+        self._step_start_ts = None
+        self._train_start_ts = None
+        self._train_duration_sec = 0.0
+        self._csv_file = None
+        self._csv_writer = None
+        self._step_fieldnames = [
+            "step",
+            "elapsed_sec",
+            "step_duration_ms",
+            "gpu_util",
+            "gpu_mem_used",
+            "gpu_mem_total",
+            "gpu_power_w",
+            "gpu_energy_mj",
+            "step_energy_kwh",
+            "step_carbon_gco2",
+            "cumulative_gpu_energy_kwh",
+            "cumulative_carbon_gco2",
+            "torch_cuda_allocated_mib",
+            "torch_cuda_reserved_mib",
+            "sys_mem_used",
+            "sys_mem_total",
+            "sys_cpu_percent",
+            "proc_rss",
+            "proc_vms",
+            "proc_cpu_percent",
+            "io_read",
+            "io_write",
+        ]
 
     def start_train(self) -> None:
+        self._train_start_ts = time.perf_counter()
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._csv_file = open(self.step_csv_path, "w", newline="", encoding="utf-8")
+        self._csv_writer = csv.DictWriter(self._csv_file, fieldnames=self._step_fieldnames)
+        self._csv_writer.writeheader()
+
         if psutil is None:
             logger.warning("psutil is not available; system/process stats will be disabled")
             self.include_system = False
             self.include_process = False
+            self.include_cpu = False
             self.include_io = False
         else:
             self._process = psutil.Process()
+            if self.include_cpu:
+                psutil.cpu_percent(interval=None)
+                self._process.cpu_percent(interval=None)
 
         if self.include_gpu:
             if pynvml is None:
                 logger.warning("pynvml is not available; GPU stats will be disabled")
                 self.include_gpu = False
+                self.include_energy = False
             else:
                 try:
                     pynvml.nvmlInit()
                     self._nvml_ready = True
                     self._nvml_handle = self._get_nvml_handle()
+                    if self.include_energy:
+                        try:
+                            self._prev_total_energy_mj = float(
+                                pynvml.nvmlDeviceGetTotalEnergyConsumption(self._nvml_handle)
+                            )
+                        except Exception:
+                            logger.warning("NVML total energy counter unavailable; disabling energy and carbon tracking.")
+                            self.include_energy = False
                 except Exception:
                     logger.exception("Failed to initialize NVML; GPU stats will be disabled")
                     self.include_gpu = False
+                    self.include_energy = False
 
     def stop_train(self) -> None:
+        if self._train_start_ts is not None:
+            self._train_duration_sec = time.perf_counter() - self._train_start_ts
+
+        if self._csv_file is not None:
+            self._csv_file.close()
+            self._csv_file = None
+
         if self._nvml_ready:
             try:
                 pynvml.nvmlShutdown()
@@ -92,10 +172,13 @@ class ResourceTrainerStats(base.TrainerStats):
                 logger.exception("Failed to shutdown NVML cleanly")
 
     def start_step(self) -> None:
-        pass
+        self._step_start_ts = time.perf_counter_ns()
 
     def stop_step(self) -> None:
-        pass
+        if self._step_start_ts is not None:
+            delta_ms = (time.perf_counter_ns() - self._step_start_ts) / 1000000.0
+            self.step_duration_ms.update(delta_ms)
+            self._step_start_ts = None
 
     def start_forward(self) -> None:
         pass
@@ -129,6 +212,13 @@ class ResourceTrainerStats(base.TrainerStats):
         sample = self._sample()
         if sample is None:
             return
+
+        if self._csv_writer is not None:
+            row = {key: sample.get(key, None) for key in self._step_fieldnames}
+            self._csv_writer.writerow(row)
+            if self._csv_file is not None:
+                self._csv_file.flush()
+
         if (self.iteration % self.log_every) != 0:
             return
 
@@ -149,6 +239,10 @@ class ResourceTrainerStats(base.TrainerStats):
             parts.append(
                 f"io=read {sample['io_read']:.2f} MB write {sample['io_write']:.2f} MB"
             )
+        if "step_energy_kwh" in sample:
+            parts.append(
+                f"energy={sample['step_energy_kwh'] * 1000:.4f} Wh carbon={sample['step_carbon_gco2']:.4f} gCO2e"
+            )
         print(" | ".join(parts))
 
     def log_stats(self) -> None:
@@ -157,19 +251,89 @@ class ResourceTrainerStats(base.TrainerStats):
             self._print_avg("gpu_util", self.gpu_util, "%")
             self._print_avg("gpu_mem_used", self.gpu_mem_used, "MiB")
             self._print_avg("gpu_mem_total", self.gpu_mem_total, "MiB")
+        if self.gpu_power_w.history:
+            self._print_avg("gpu_power_w", self.gpu_power_w, "W")
+        if self.gpu_energy_mj.history:
+            self._print_avg("gpu_energy_mj", self.gpu_energy_mj, "mJ")
+        if self.step_energy_kwh.history:
+            self._print_avg("step_energy_kwh", self.step_energy_kwh, "kWh")
+            self._print_avg("step_carbon_gco2", self.step_carbon_gco2, "gCO2e")
+            print(f"  cumulative_gpu_energy_kwh: {self._cumulative_energy_kwh:.8f}")
+            print(f"  cumulative_carbon_gco2: {self._cumulative_carbon_gco2:.6f}")
         if self.sys_mem_used.history:
             self._print_avg("sys_mem_used", self.sys_mem_used, "MiB")
             self._print_avg("sys_mem_total", self.sys_mem_total, "MiB")
         if self.proc_rss.history:
             self._print_avg("proc_rss", self.proc_rss, "MiB")
             self._print_avg("proc_vms", self.proc_vms, "MiB")
+        if self.torch_cuda_allocated_mib.history:
+            self._print_avg("torch_cuda_allocated_mib", self.torch_cuda_allocated_mib, "MiB")
+            self._print_avg("torch_cuda_reserved_mib", self.torch_cuda_reserved_mib, "MiB")
         if self.proc_io_read.history:
             self._print_avg("io_read", self.proc_io_read, "MB")
             self._print_avg("io_write", self.proc_io_write, "MB")
+        if self.step_duration_ms.history:
+            self._print_avg("step_duration_ms", self.step_duration_ms, "ms")
+        if self.sys_cpu_percent.history:
+            self._print_avg("sys_cpu_percent", self.sys_cpu_percent, "%")
+        if self.proc_cpu_percent.history:
+            self._print_avg("proc_cpu_percent", self.proc_cpu_percent, "%")
+        print(f"  total_training_time_sec: {self._train_duration_sec:.3f}")
+
+        summary = {
+            "iterations": self.iteration,
+            "total_training_time_sec": self._train_duration_sec,
+            "carbon_intensity_gco2_per_kwh": self.carbon_intensity_gco2_per_kwh,
+            "cumulative_gpu_energy_kwh": self._cumulative_energy_kwh,
+            "cumulative_carbon_gco2": self._cumulative_carbon_gco2,
+            "averages": {
+                "gpu_util": self._avg_or_none(self.gpu_util),
+                "gpu_mem_used_mib": self._avg_or_none(self.gpu_mem_used),
+                "gpu_mem_total_mib": self._avg_or_none(self.gpu_mem_total),
+                "gpu_power_w": self._avg_or_none(self.gpu_power_w),
+                "gpu_energy_mj": self._avg_or_none(self.gpu_energy_mj),
+                "step_energy_kwh": self._avg_or_none(self.step_energy_kwh),
+                "step_carbon_gco2": self._avg_or_none(self.step_carbon_gco2),
+                "torch_cuda_allocated_mib": self._avg_or_none(self.torch_cuda_allocated_mib),
+                "torch_cuda_reserved_mib": self._avg_or_none(self.torch_cuda_reserved_mib),
+                "sys_mem_used_mib": self._avg_or_none(self.sys_mem_used),
+                "sys_mem_total_mib": self._avg_or_none(self.sys_mem_total),
+                "sys_cpu_percent": self._avg_or_none(self.sys_cpu_percent),
+                "proc_rss_mib": self._avg_or_none(self.proc_rss),
+                "proc_vms_mib": self._avg_or_none(self.proc_vms),
+                "proc_cpu_percent": self._avg_or_none(self.proc_cpu_percent),
+                "io_read_mb": self._avg_or_none(self.proc_io_read),
+                "io_write_mb": self._avg_or_none(self.proc_io_write),
+                "step_duration_ms": self._avg_or_none(self.step_duration_ms),
+            },
+            "peaks": {
+                "gpu_util": self._max_or_none(self.gpu_util),
+                "gpu_mem_used_mib": self._max_or_none(self.gpu_mem_used),
+                "gpu_power_w": self._max_or_none(self.gpu_power_w),
+                "torch_cuda_allocated_mib": self._max_or_none(self.torch_cuda_allocated_mib),
+                "torch_cuda_reserved_mib": self._max_or_none(self.torch_cuda_reserved_mib),
+                "sys_mem_used_mib": self._max_or_none(self.sys_mem_used),
+                "proc_rss_mib": self._max_or_none(self.proc_rss),
+                "step_duration_ms": self._max_or_none(self.step_duration_ms),
+            },
+        }
+        with open(self.summary_json_path, "w", encoding="utf-8") as fp:
+            json.dump(summary, fp, indent=2)
+        print(f"resource summary saved to {self.summary_json_path}")
 
     def _print_avg(self, name: str, stat: utils.RunningStat, unit: str) -> None:
         avg = stat.get_average()
         print(f"  {name}: {avg:.3f} {unit}")
+
+    def _avg_or_none(self, stat: utils.RunningStat) -> Optional[float]:
+        if not stat.history:
+            return None
+        return float(stat.get_average())
+
+    def _max_or_none(self, stat: utils.RunningStat) -> Optional[float]:
+        if not stat.history:
+            return None
+        return float(max(stat.history))
 
     def _get_nvml_handle(self):
         if not self._nvml_ready:
@@ -183,7 +347,15 @@ class ResourceTrainerStats(base.TrainerStats):
         return pynvml.nvmlDeviceGetHandleByIndex(0)
 
     def _sample(self) -> Optional[Dict[str, float]]:
-        sample: Dict[str, float] = {}
+        elapsed_sec = 0.0
+        if self._train_start_ts is not None:
+            elapsed_sec = time.perf_counter() - self._train_start_ts
+
+        sample: Dict[str, float] = {
+            "step": self.iteration,
+            "elapsed_sec": elapsed_sec,
+            "step_duration_ms": self.step_duration_ms.get_last(),
+        }
 
         if self.include_gpu and self._nvml_ready and self._nvml_handle is not None:
             try:
@@ -192,6 +364,13 @@ class ResourceTrainerStats(base.TrainerStats):
                 gpu_util = float(util.gpu)
                 gpu_mem_used = float(mem.used) / (1024 * 1024)
                 gpu_mem_total = float(mem.total) / (1024 * 1024)
+                try:
+                    gpu_power_w = float(pynvml.nvmlDeviceGetPowerUsage(self._nvml_handle)) / 1000.0
+                    self.gpu_power_w.update(gpu_power_w)
+                    sample["gpu_power_w"] = gpu_power_w
+                except Exception:
+                    pass
+
                 self.gpu_util.update(gpu_util)
                 self.gpu_mem_used.update(gpu_mem_used)
                 self.gpu_mem_total.update(gpu_mem_total)
@@ -202,9 +381,59 @@ class ResourceTrainerStats(base.TrainerStats):
                         "gpu_mem_total": gpu_mem_total,
                     }
                 )
+                if self.include_energy:
+                    try:
+                        total_energy_mj = float(pynvml.nvmlDeviceGetTotalEnergyConsumption(self._nvml_handle))
+                        if self._prev_total_energy_mj is None:
+                            step_energy_mj = 0.0
+                        else:
+                            step_energy_mj = max(0.0, total_energy_mj - self._prev_total_energy_mj)
+                        self._prev_total_energy_mj = total_energy_mj
+
+                        step_energy_kwh = step_energy_mj / 3_600_000_000.0
+                        step_carbon_gco2 = step_energy_kwh * self.carbon_intensity_gco2_per_kwh
+                        self._cumulative_energy_kwh += step_energy_kwh
+                        self._cumulative_carbon_gco2 += step_carbon_gco2
+
+                        self.gpu_energy_mj.update(step_energy_mj)
+                        self.step_energy_kwh.update(step_energy_kwh)
+                        self.step_carbon_gco2.update(step_carbon_gco2)
+                        sample.update(
+                            {
+                                "gpu_energy_mj": step_energy_mj,
+                                "step_energy_kwh": step_energy_kwh,
+                                "step_carbon_gco2": step_carbon_gco2,
+                                "cumulative_gpu_energy_kwh": self._cumulative_energy_kwh,
+                                "cumulative_carbon_gco2": self._cumulative_carbon_gco2,
+                            }
+                        )
+                    except Exception:
+                        logger.warning("Failed to read NVML total energy counter; disabling energy and carbon tracking.")
+                        self.include_energy = False
             except Exception:
                 logger.exception("Failed to read GPU stats")
                 self.include_gpu = False
+                self.include_energy = False
+
+        if (
+            self.include_torch_cuda_memory
+            and torch.cuda.is_available()
+            and self.device is not None
+            and getattr(self.device, "type", None) == "cuda"
+        ):
+            try:
+                device_idx = self.device.index
+                if device_idx is None:
+                    device_idx = torch.cuda.current_device()
+                allocated_mib = float(torch.cuda.memory_allocated(device_idx)) / (1024 * 1024)
+                reserved_mib = float(torch.cuda.memory_reserved(device_idx)) / (1024 * 1024)
+                self.torch_cuda_allocated_mib.update(allocated_mib)
+                self.torch_cuda_reserved_mib.update(reserved_mib)
+                sample["torch_cuda_allocated_mib"] = allocated_mib
+                sample["torch_cuda_reserved_mib"] = reserved_mib
+            except Exception:
+                logger.warning("Failed to read torch CUDA memory stats; disabling torch CUDA memory tracking.")
+                self.include_torch_cuda_memory = False
 
         if self.include_system and self._process is not None:
             try:
@@ -219,6 +448,10 @@ class ResourceTrainerStats(base.TrainerStats):
                         "sys_mem_total": sys_mem_total,
                     }
                 )
+                if self.include_cpu:
+                    sys_cpu = float(psutil.cpu_percent(interval=None))
+                    self.sys_cpu_percent.update(sys_cpu)
+                    sample["sys_cpu_percent"] = sys_cpu
             except Exception:
                 logger.exception("Failed to read system memory stats")
                 self.include_system = False
@@ -236,6 +469,10 @@ class ResourceTrainerStats(base.TrainerStats):
                         "proc_vms": proc_vms,
                     }
                 )
+                if self.include_cpu:
+                    proc_cpu = float(self._process.cpu_percent(interval=None))
+                    self.proc_cpu_percent.update(proc_cpu)
+                    sample["proc_cpu_percent"] = proc_cpu
             except Exception:
                 logger.exception("Failed to read process memory stats")
                 self.include_process = False
@@ -265,6 +502,6 @@ class ResourceTrainerStats(base.TrainerStats):
                 logger.exception("Failed to read process I/O stats")
                 self.include_io = False
 
-        if len(sample) == 0:
+        if len(sample) <= 3:
             return None
         return sample

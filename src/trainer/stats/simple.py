@@ -1,4 +1,7 @@
 import logging
+import csv
+import json
+import os
 import src.config as config
 import src.trainer.stats.base as base
 import src.trainer.stats.utils as utils
@@ -14,7 +17,7 @@ def construct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats
     else:
         logger.warning("No device provided to simple trainer stats. Using default PyTorch device")
         device = torch.get_default_device()
-    return SimpleTrainerStats(device=device)
+    return SimpleTrainerStats(device=device, conf=conf)
 
 class SimpleTrainerStats(base.TrainerStats):
     """Provides simple timing measurements of training.
@@ -52,7 +55,7 @@ class SimpleTrainerStats(base.TrainerStats):
 
     """
 
-    def __init__(self, device : torch.device) -> None:
+    def __init__(self, device : torch.device, conf: config.Config) -> None:
         super().__init__()
         self.device = device
         self.step_stats = utils.RunningTimer()
@@ -60,12 +63,36 @@ class SimpleTrainerStats(base.TrainerStats):
         self.backward_stats = utils.RunningTimer()
         self.optimizer_step_stats = utils.RunningTimer()
         self.save_checkpoint_stats = utils.RunningTimer()
+        self.iteration = 0
+
+        simple_cfg = conf.trainer_stats_configs.simple
+        self.output_dir = str(getattr(simple_cfg, "output_dir", "."))
+        self.output_file_prefix = str(getattr(simple_cfg, "output_file_prefix", "simple_stats"))
+        self.step_csv_path = os.path.join(self.output_dir, f"{self.output_file_prefix}_steps.csv")
+        self.summary_json_path = os.path.join(self.output_dir, f"{self.output_file_prefix}_summary.json")
+        self._csv_file = None
+        self._csv_writer = None
 
     def start_train(self) -> None:
-        pass
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._csv_file = open(self.step_csv_path, "w", newline="", encoding="utf-8")
+        self._csv_writer = csv.DictWriter(
+            self._csv_file,
+            fieldnames=[
+                "step",
+                "step_ms",
+                "forward_ms",
+                "backward_ms",
+                "optimizer_step_ms",
+                "checkpoint_ms",
+            ],
+        )
+        self._csv_writer.writeheader()
 
     def stop_train(self) -> None:
-        pass
+        if self._csv_file is not None:
+            self._csv_file.close()
+            self._csv_file = None
 
     def start_step(self) -> None:
         torch.cuda.synchronize(self.device)
@@ -115,7 +142,24 @@ class SimpleTrainerStats(base.TrainerStats):
         milliseconds.
 
         """
-        print(f"step {self.step_stats.get_last() / 1000000} -- forward {self.forward_stats.get_last() / 1000000} -- backward {self.backward_stats.get_last() / 1000000} -- optimizer step {self.optimizer_step_stats.get_last() / 1000000}")
+        self.iteration += 1
+        step_ms = self.step_stats.get_last() / 1000000
+        forward_ms = self.forward_stats.get_last() / 1000000
+        backward_ms = self.backward_stats.get_last() / 1000000
+        optimizer_ms = self.optimizer_step_stats.get_last() / 1000000
+        checkpoint_ms = self.save_checkpoint_stats.get_last() / 1000000
+        print(f"step {step_ms} -- forward {forward_ms} -- backward {backward_ms} -- optimizer step {optimizer_ms}")
+        if self._csv_writer is not None:
+            self._csv_writer.writerow(
+                {
+                    "step": self.iteration,
+                    "step_ms": step_ms,
+                    "forward_ms": forward_ms,
+                    "backward_ms": backward_ms,
+                    "optimizer_step_ms": optimizer_ms,
+                    "checkpoint_ms": checkpoint_ms,
+                }
+            )
 
     def log_stats(self) -> None:
         """Log basic statistics on the time measurements.
@@ -137,6 +181,19 @@ class SimpleTrainerStats(base.TrainerStats):
         # NOTE: (greta) commented out for now - not using checkpointing stats
         # print("###############   CHECKPOINTING    #################")
         # self.save_checkpoint_stats.log_analysis()
+        summary = {
+            "iterations": self.iteration,
+            "averages_ms": {
+                "step_ms": self.step_stats.get_average() / 1000000,
+                "forward_ms": self.forward_stats.get_average() / 1000000,
+                "backward_ms": self.backward_stats.get_average() / 1000000,
+                "optimizer_step_ms": self.optimizer_step_stats.get_average() / 1000000,
+                "checkpoint_ms": self.save_checkpoint_stats.get_average() / 1000000,
+            },
+        }
+        with open(self.summary_json_path, "w", encoding="utf-8") as fp:
+            json.dump(summary, fp, indent=2)
+        print(f"simple summary saved to {self.summary_json_path}")
 
     def log_loss(self, loss : torch.Tensor) -> None:
         pass
