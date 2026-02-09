@@ -8,13 +8,15 @@ BYTES_PER_TOKEN = 24  # input_ids + attention_mask + labels (int64 each => 3*8)
 
 
 class SyntheticCausalLMDataset(Dataset):
-    def __init__(self, vocab_size: int, seq_len: int, target_gb: float):
+    def __init__(self, vocab_size: int, seq_len: int, target_gb: float, max_samples: int = 0):
         self.vocab_size = vocab_size
         self.seq_len = seq_len
 
         target_bytes = int(target_gb * 1024**3)
         total_tokens = max(1, target_bytes // BYTES_PER_TOKEN)
         self.num_samples = max(1, total_tokens // seq_len)
+        if max_samples is not None and max_samples > 0:
+            self.num_samples = min(self.num_samples, max_samples)
 
         self.data = torch.randint(
             0, vocab_size, (self.num_samples, seq_len), dtype=torch.long
@@ -44,8 +46,9 @@ def load_data(conf):
     dataset_gb = pick("dataset_gb", 2.5)
     batch_size = pick("batch_size", 1)
     num_workers = pick("num_workers", 2)
+    max_samples = pick("max_samples", 0)
 
-    dataset = SyntheticCausalLMDataset(vocab_size, seq_len, dataset_gb)
+    dataset = SyntheticCausalLMDataset(vocab_size, seq_len, dataset_gb, max_samples=max_samples)
     return DataLoader(
         dataset,
         batch_size=batch_size,
