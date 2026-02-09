@@ -5,4 +5,4 @@ then
 fi
 
 # Override SLURM defaults for this repo.
-export COMP597_SLURM_TIME_LIMIT="90:00"
+export COMP597_SLURM_TIME_LIMIT="200:00"
