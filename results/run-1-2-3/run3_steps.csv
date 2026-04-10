@@ -1,1 +1,0 @@
-step,elapsed_sec,step_duration_ms,gpu_util,gpu_mem_used,gpu_mem_total,gpu_power_w,gpu_energy_mj,step_energy_kwh,step_carbon_gco2,cumulative_gpu_energy_kwh,cumulative_carbon_gco2,torch_cuda_allocated_mib,torch_cuda_reserved_mib,sys_mem_used,sys_mem_total,sys_cpu_percent,proc_rss,proc_vms,proc_cpu_percent,io_read,io_write

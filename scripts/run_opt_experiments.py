@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import copy
 import json
 import math
 import os
@@ -73,6 +74,54 @@ def get_gpu_info() -> str:
         return "unknown"
 
 
+def check_duration_validity(elapsed_sec: float, target_sec: float, tolerance_sec: float) -> bool:
+    if target_sec <= 0:
+        return True
+    return abs(elapsed_sec - target_sec) <= tolerance_sec
+
+
+def build_matrix_status(
+    runs: List[Dict],
+    batch_sweep: List[int],
+    profiles: List[str],
+    repeats: int,
+    require_valid_duration: bool,
+) -> Dict:
+    cells: Dict[str, Dict] = {}
+    matrix_complete = True
+    for batch_size in batch_sweep:
+        for profile in profiles:
+            matching = [r for r in runs if r["batch_size"] == batch_size and r["profile"] == profile]
+            run_count = len(matching)
+            success_count = sum(1 for r in matching if int(r.get("returncode", 1)) == 0)
+            valid_duration_count = sum(1 for r in matching if bool(r.get("valid_duration", False)))
+            good_count = sum(
+                1
+                for r in matching
+                if int(r.get("returncode", 1)) == 0
+                and (bool(r.get("valid_duration", False)) or not require_valid_duration)
+            )
+            cell_complete = (
+                run_count == repeats
+                and success_count == repeats
+                and (valid_duration_count == repeats if require_valid_duration else True)
+            )
+            matrix_complete = matrix_complete and cell_complete
+            key = f"batch_{batch_size}_profile_{profile}"
+            cells[key] = {
+                "batch_size": batch_size,
+                "profile": profile,
+                "expected_repeats": repeats,
+                "run_count": run_count,
+                "success_count": success_count,
+                "valid_duration_count": valid_duration_count,
+                "good_count": good_count,
+                "missing_runs": max(0, repeats - run_count),
+                "complete": cell_complete,
+            }
+    return {"matrix_complete": matrix_complete, "cells": cells}
+
+
 def build_common_args(args: argparse.Namespace, batch_size: int, repeat_id: int) -> List[str]:
     return [
         "--logging.level",
@@ -114,33 +163,17 @@ def profile_args(profile: str, run_dir: str) -> List[str]:
     if profile == "A":
         return ["--trainer_stats", "noop"]
     if profile == "B":
+        # CodeCarbon end-to-end only: disable step/substep task tracking.
         return [
-            "--trainer_stats",
-            "resource",
-            "--trainer_stats_configs.resource.output_dir",
+            "--trainer_stats", "codecarbon",
+            "--trainer_stats_configs.codecarbon.output_dir",
             run_dir,
-            "--trainer_stats_configs.resource.output_file_prefix",
-            "resource",
-            "--trainer_stats_configs.resource.plot_metrics",
+            "--trainer_stats_configs.codecarbon.project_name",
+            "opt_e2e_energy",
+            "--trainer_stats_configs.codecarbon.track_steps",
             "0",
-            "--trainer_stats_configs.resource.include_gpu",
-            "1",
-            "--trainer_stats_configs.resource.include_energy",
-            "1",
-            "--trainer_stats_configs.resource.include_system",
+            "--trainer_stats_configs.codecarbon.track_substeps",
             "0",
-            "--trainer_stats_configs.resource.include_process",
-            "0",
-            "--trainer_stats_configs.resource.include_cpu",
-            "0",
-            "--trainer_stats_configs.resource.include_io",
-            "0",
-            "--trainer_stats_configs.resource.include_torch_cuda_memory",
-            "0",
-            "--trainer_stats_configs.resource.sample_interval_ms",
-            "500",
-            "--trainer_stats_configs.resource.flush_every_n",
-            "50",
         ]
     if profile == "C":
         return [
@@ -264,9 +297,9 @@ def probe_max_batch(
     if high_fail is None:
         return max(1, low_success), records
 
-    logger.info(f"Binary search between {lo} and {hi}")
     lo = low_success + 1
     hi = high_fail - 1
+    logger.info(f"Binary search between {lo} and {hi}")
     best = low_success
     while lo <= hi:
         mid = (lo + hi) // 2
@@ -341,7 +374,7 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=1e-6)
     parser.add_argument("--hf-name", type=str, default="facebook/opt-350m")
     parser.add_argument("--dtype", type=str, default="fp32")
-    parser.add_argument("--seq-len", type=int, default=512)
+    parser.add_argument("--seq-len", type=int, default=1024)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--max-samples", type=int, default=100000000)
     parser.add_argument("--probe-start-batch", type=int, default=16)
@@ -349,11 +382,24 @@ def main() -> int:
     parser.add_argument("--probe-duration-sec", type=float, default=20.0)
     parser.add_argument("--skip-probe", action="store_true")
     parser.add_argument("--max-batch-size", type=int, default=0)
+    parser.add_argument("--duration-tolerance-sec", type=float, default=5.0)
+    parser.add_argument(
+        "--require-valid-duration",
+        type=int,
+        default=1,
+        help="Require all runs to satisfy duration tolerance for matrix completeness (1=yes, 0=no).",
+    )
+    parser.add_argument(
+        "--strict-matrix",
+        type=int,
+        default=1,
+        help="Exit non-zero when matrix is incomplete (1=yes, 0=no).",
+    )
     parser.add_argument(
         "--fixed-batch-size",
         type=int,
-        default=16,
-        help="If >0, skip probing and use this value as the max batch size (default: 16).",
+        default=0,
+        help="If >0, skip probing and use this value as the max batch size.",
     )
     parser.add_argument("--profiles", type=str, default="A,B,C")
     args = parser.parse_args()
@@ -372,9 +418,22 @@ def main() -> int:
         "host": socket.gethostname(),
         "gpu_info": get_gpu_info(),
         "params": vars(args),
+        "hyperparameters": {
+            "seq_len": args.seq_len,
+            "dtype": args.dtype,
+            "learning_rate": args.learning_rate,
+            "num_workers": args.num_workers,
+            "max_samples": args.max_samples,
+            "seed": args.seed,
+            "hf_name": args.hf_name,
+            "duration_sec": args.duration_sec,
+            "duration_tolerance_sec": args.duration_tolerance_sec,
+            "launcher": " ".join(launcher),
+        },
         "probe_records": [],
         "batch_sweep": [],
         "runs": [],
+        "matrix_status": {},
     }
 
     if args.fixed_batch_size > 0:
@@ -416,8 +475,17 @@ def main() -> int:
                 os.makedirs(run_dir, exist_ok=True)
                 cmd = launcher + build_common_args(args, batch_size=batch_size, repeat_id=repeat)
                 cmd += profile_args(profile, run_dir=run_dir)
+                if profile == "B":
+                    # Deterministic file names for profile-B CodeCarbon outputs.
+                    codecarbon_run_num = batch_size * 1000 + repeat
+                    cmd += ["--trainer_stats_configs.codecarbon.run_num", str(codecarbon_run_num)]
 
                 result = run_command(cmd=cmd, cwd=cwd, log_dir=run_dir)
+                valid_duration = check_duration_validity(
+                    elapsed_sec=result["elapsed_sec"],
+                    target_sec=args.duration_sec,
+                    tolerance_sec=args.duration_tolerance_sec,
+                )
                 record = {
                     "batch_size": batch_size,
                     "profile": profile,
@@ -429,20 +497,50 @@ def main() -> int:
                     "oom_detected": result["oom_detected"],
                     "stdout_path": result["stdout_path"],
                     "stderr_path": result["stderr_path"],
+                    "valid_duration": valid_duration,
+                    "duration_target_sec": args.duration_sec,
+                    "duration_tolerance_sec": args.duration_tolerance_sec,
+                    "hyperparameters": {
+                        "seq_len": args.seq_len,
+                        "dtype": args.dtype,
+                        "learning_rate": args.learning_rate,
+                        "num_workers": args.num_workers,
+                        "max_samples": args.max_samples,
+                        "seed": args.seed,
+                        "hf_name": args.hf_name,
+                    },
                 }
                 with open(os.path.join(run_dir, "run_timing.json"), "w", encoding="utf-8") as fp:
                     json.dump(record, fp, indent=2)
                 manifest["runs"].append(record)
 
                 status_str = "SUCCESS" if result["returncode"] == 0 else "FAILED"
-                logger.info(f"Run {current_run}/{total_runs} {status_str} ({result['elapsed_sec']:.1f}s)")
+                logger.info(
+                    f"Run {current_run}/{total_runs} {status_str} "
+                    f"({result['elapsed_sec']:.1f}s, valid_duration={valid_duration})"
+                )
 
                 if result["returncode"] != 0:
+                    manifest["matrix_status"] = build_matrix_status(
+                        runs=manifest["runs"],
+                        batch_sweep=batch_sweep,
+                        profiles=profiles,
+                        repeats=args.repeats,
+                        require_valid_duration=bool(args.require_valid_duration),
+                    )
                     with open(os.path.join(out_dir, "manifest.json"), "w", encoding="utf-8") as fp:
                         json.dump(manifest, fp, indent=2)
                     logger.error(f"Run failed: batch={batch_size}, profile={profile}, repeat={repeat}")
                     logger.error(f"See logs under: {run_dir}")
                     return 1
+
+    manifest["matrix_status"] = build_matrix_status(
+        runs=manifest["runs"],
+        batch_sweep=batch_sweep,
+        profiles=profiles,
+        repeats=args.repeats,
+        require_valid_duration=bool(args.require_valid_duration),
+    )
 
     with open(os.path.join(out_dir, "manifest.json"), "w", encoding="utf-8") as fp:
         json.dump(manifest, fp, indent=2)
@@ -452,6 +550,10 @@ def main() -> int:
     logger.info(f"Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f}m)")
     logger.info(f"Output root: {out_dir}")
     logger.info(f"Max batch discovered: {max_batch}, using sweep: {batch_sweep}")
+    logger.info(f"Matrix complete: {manifest['matrix_status'].get('matrix_complete', False)}")
+    if bool(args.strict_matrix) and not bool(manifest["matrix_status"].get("matrix_complete", False)):
+        logger.error("Matrix is incomplete under current validation settings.")
+        return 2
     return 0
 
 

@@ -1,0 +1,2 @@
+Detected low GPU-utilization windows (potential efficiency opportunities):
+- 0s to 300s (duration=301s, avg_gpu_util=83.31%)

@@ -74,7 +74,7 @@ def load_data(conf):
         return getattr(conf, name, default)
 
     vocab_size = pick("vocab_size", 50272)  # OPT default vocab size
-    seq_len = pick("seq_len", 512)
+    seq_len = pick("seq_len", 1024)
     dataset_gb = pick("dataset_gb", 2.5)
     batch_size = pick("batch_size", 1)
     num_workers = pick("num_workers", 2)

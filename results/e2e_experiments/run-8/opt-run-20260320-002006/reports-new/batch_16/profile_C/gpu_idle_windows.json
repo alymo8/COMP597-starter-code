@@ -1,0 +1,176 @@
+[
+  {
+    "start_sec": 0,
+    "end_sec": 30,
+    "duration_sec": 31,
+    "avg_gpu_util": 91.58602150537634
+  },
+  {
+    "start_sec": 32,
+    "end_sec": 37,
+    "duration_sec": 6,
+    "avg_gpu_util": 93.25
+  },
+  {
+    "start_sec": 39,
+    "end_sec": 44,
+    "duration_sec": 6,
+    "avg_gpu_util": 92.08333333333333
+  },
+  {
+    "start_sec": 46,
+    "end_sec": 51,
+    "duration_sec": 6,
+    "avg_gpu_util": 92.08333333333333
+  },
+  {
+    "start_sec": 53,
+    "end_sec": 58,
+    "duration_sec": 6,
+    "avg_gpu_util": 92.05555555555556
+  },
+  {
+    "start_sec": 60,
+    "end_sec": 69,
+    "duration_sec": 10,
+    "avg_gpu_util": 92.71666666666667
+  },
+  {
+    "start_sec": 71,
+    "end_sec": 73,
+    "duration_sec": 3,
+    "avg_gpu_util": 92.5
+  },
+  {
+    "start_sec": 75,
+    "end_sec": 77,
+    "duration_sec": 3,
+    "avg_gpu_util": 92.33333333333333
+  },
+  {
+    "start_sec": 79,
+    "end_sec": 84,
+    "duration_sec": 6,
+    "avg_gpu_util": 92.11111111111111
+  },
+  {
+    "start_sec": 86,
+    "end_sec": 88,
+    "duration_sec": 3,
+    "avg_gpu_util": 92.44444444444444
+  },
+  {
+    "start_sec": 90,
+    "end_sec": 92,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.94444444444444
+  },
+  {
+    "start_sec": 94,
+    "end_sec": 96,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.88888888888889
+  },
+  {
+    "start_sec": 98,
+    "end_sec": 103,
+    "duration_sec": 6,
+    "avg_gpu_util": 92.02777777777777
+  },
+  {
+    "start_sec": 105,
+    "end_sec": 107,
+    "duration_sec": 3,
+    "avg_gpu_util": 92.44444444444444
+  },
+  {
+    "start_sec": 109,
+    "end_sec": 111,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.94444444444444
+  },
+  {
+    "start_sec": 113,
+    "end_sec": 115,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.66666666666667
+  },
+  {
+    "start_sec": 117,
+    "end_sec": 122,
+    "duration_sec": 6,
+    "avg_gpu_util": 91.47222222222223
+  },
+  {
+    "start_sec": 124,
+    "end_sec": 126,
+    "duration_sec": 3,
+    "avg_gpu_util": 92.44444444444444
+  },
+  {
+    "start_sec": 128,
+    "end_sec": 130,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.66666666666667
+  },
+  {
+    "start_sec": 132,
+    "end_sec": 134,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.38888888888889
+  },
+  {
+    "start_sec": 136,
+    "end_sec": 149,
+    "duration_sec": 14,
+    "avg_gpu_util": 92.05952380952381
+  },
+  {
+    "start_sec": 151,
+    "end_sec": 153,
+    "duration_sec": 3,
+    "avg_gpu_util": 90.83333333333333
+  },
+  {
+    "start_sec": 155,
+    "end_sec": 161,
+    "duration_sec": 7,
+    "avg_gpu_util": 93.16666666666667
+  },
+  {
+    "start_sec": 163,
+    "end_sec": 165,
+    "duration_sec": 3,
+    "avg_gpu_util": 90.72222222222223
+  },
+  {
+    "start_sec": 167,
+    "end_sec": 173,
+    "duration_sec": 7,
+    "avg_gpu_util": 92.21428571428571
+  },
+  {
+    "start_sec": 175,
+    "end_sec": 177,
+    "duration_sec": 3,
+    "avg_gpu_util": 91.66666666666667
+  },
+  {
+    "start_sec": 179,
+    "end_sec": 270,
+    "duration_sec": 92,
+    "avg_gpu_util": 93.21920289855072
+  },
+  {
+    "start_sec": 272,
+    "end_sec": 295,
+    "duration_sec": 24,
+    "avg_gpu_util": 92.875
+  },
+  {
+    "start_sec": 297,
+    "end_sec": 300,
+    "duration_sec": 4,
+    "avg_gpu_util": 92.25
+  }
+]

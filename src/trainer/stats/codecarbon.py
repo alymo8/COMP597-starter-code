@@ -27,7 +27,15 @@ def construct_trainer_stats(conf : config.Config, **kwargs) -> base.TrainerStats
     else:
         logger.warning("No device provided to codecarbon trainer stats. Using default PyTorch device")
         device = torch.get_default_device() 
-    return CodeCarbonStats(device, conf.trainer_stats_configs.codecarbon.run_num, conf.trainer_stats_configs.codecarbon.project_name, conf.trainer_stats_configs.codecarbon.output_dir)
+    cc_cfg = conf.trainer_stats_configs.codecarbon
+    return CodeCarbonStats(
+        device,
+        cc_cfg.run_num,
+        cc_cfg.project_name,
+        cc_cfg.output_dir,
+        track_steps=bool(int(getattr(cc_cfg, "track_steps", 1))),
+        track_substeps=bool(int(getattr(cc_cfg, "track_substeps", 1))),
+    )
 
 class SimpleFileOutput(BaseOutput): 
     
@@ -149,7 +157,15 @@ class CodeCarbonStats(base.TrainerStats):
 
     """
 
-    def __init__(self, device : torch.device, run_num : int, project_name : str, output_dir : str) -> None: 
+    def __init__(
+        self,
+        device : torch.device,
+        run_num : int,
+        project_name : str,
+        output_dir : str,
+        track_steps: bool = True,
+        track_substeps: bool = True,
+    ) -> None: 
         
         # Track current iteration number in the training loop
         self.iteration = 0
@@ -165,6 +181,8 @@ class CodeCarbonStats(base.TrainerStats):
         self.losses = []
         self.project_name = project_name
         self.output_dir = output_dir
+        self.track_steps = track_steps
+        self.track_substeps = track_substeps
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Normal-mode tracker to track the entire training loop
@@ -208,8 +226,10 @@ class CodeCarbonStats(base.TrainerStats):
         )
 
         # Initialise task-mode trackers
-        self.training_substep_tracker.start() # initialisation step
-        self.training_step_tracker.start()       
+        if self.track_substeps:
+            self.training_substep_tracker.start() # initialisation step
+        if self.track_steps:
+            self.training_step_tracker.start()
 
     def start_train(self) -> None:
         torch.cuda.synchronize(self.device)
@@ -219,41 +239,51 @@ class CodeCarbonStats(base.TrainerStats):
         torch.cuda.synchronize(self.device)
         self.total_training_tracker.stop()
         
-        self.training_step_tracker.stop()
-        self.training_substep_tracker.stop()
+        if self.track_steps:
+            self.training_step_tracker.stop()
+        if self.track_substeps:
+            self.training_substep_tracker.stop()
 
     def start_step(self) -> None:
         self.iteration += 1
-        torch.cuda.synchronize(self.device)
-        self.training_step_tracker.start_task(task_name = f"Step #{self.iteration}")
+        if self.track_steps:
+            torch.cuda.synchronize(self.device)
+            self.training_step_tracker.start_task(task_name = f"Step #{self.iteration}")
 
     def stop_step(self) -> None:
-        torch.cuda.synchronize(self.device)
-        self.training_step_tracker.stop_task(task_name = f"Step #{self.iteration}")
+        if self.track_steps:
+            torch.cuda.synchronize(self.device)
+            self.training_step_tracker.stop_task(task_name = f"Step #{self.iteration}")
 
     def start_forward(self) -> None: 
-        torch.cuda.synchronize(self.device)
-        self.training_substep_tracker.start_task(task_name = f"Forward pass #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device)
+            self.training_substep_tracker.start_task(task_name = f"Forward pass #{self.iteration}")
 
     def stop_forward(self) -> None: 
-        torch.cuda.synchronize(self.device)
-        self.training_substep_tracker.stop_task(task_name = f"Forward pass #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device)
+            self.training_substep_tracker.stop_task(task_name = f"Forward pass #{self.iteration}")
 
     def start_backward(self) -> None:
-        torch.cuda.synchronize(self.device) 
-        self.training_substep_tracker.start_task(task_name = f"Backward pass #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device) 
+            self.training_substep_tracker.start_task(task_name = f"Backward pass #{self.iteration}")
 
     def stop_backward(self) -> None:
-        torch.cuda.synchronize(self.device) 
-        self.training_substep_tracker.stop_task(task_name = f"Backward pass #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device) 
+            self.training_substep_tracker.stop_task(task_name = f"Backward pass #{self.iteration}")
 
     def start_optimizer_step(self) -> None:
-        torch.cuda.synchronize(self.device)
-        self.training_substep_tracker.start_task(task_name = f"Optimisation step #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device)
+            self.training_substep_tracker.start_task(task_name = f"Optimisation step #{self.iteration}")
 
     def stop_optimizer_step(self) -> None:
-        torch.cuda.synchronize(self.device)
-        self.training_substep_tracker.stop_task(task_name = f"Optimisation step #{self.iteration}")
+        if self.track_substeps:
+            torch.cuda.synchronize(self.device)
+            self.training_substep_tracker.stop_task(task_name = f"Optimisation step #{self.iteration}")
 
     def start_save_checkpoint(self) -> None:
         logger.warning(f"Method 'start_save_checkpoint' is not implemented for '{self.__class__.__name__}'.")

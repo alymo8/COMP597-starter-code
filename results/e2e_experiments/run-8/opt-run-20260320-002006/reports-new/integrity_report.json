@@ -1,0 +1,106 @@
+{
+  "expected_repeats": 3,
+  "require_valid_duration": true,
+  "cells": {
+    "batch_16_profile_A": {
+      "batch_size": 16,
+      "profile": "A",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_16_profile_B": {
+      "batch_size": 16,
+      "profile": "B",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_16_profile_C": {
+      "batch_size": 16,
+      "profile": "C",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_8_profile_A": {
+      "batch_size": 8,
+      "profile": "A",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_8_profile_B": {
+      "batch_size": 8,
+      "profile": "B",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_8_profile_C": {
+      "batch_size": 8,
+      "profile": "C",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_4_profile_A": {
+      "batch_size": 4,
+      "profile": "A",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_4_profile_B": {
+      "batch_size": 4,
+      "profile": "B",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    },
+    "batch_4_profile_C": {
+      "batch_size": 4,
+      "profile": "C",
+      "run_count": 3,
+      "success_count": 3,
+      "valid_count": 3,
+      "missing_runs": 0,
+      "failed_runs": 0,
+      "invalid_duration_runs": 0,
+      "complete": true
+    }
+  },
+  "matrix_complete": true
+}

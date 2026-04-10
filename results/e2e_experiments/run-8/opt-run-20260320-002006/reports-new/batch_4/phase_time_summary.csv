@@ -1,0 +1,2 @@
+batch_size,profile,step_ms_mean,step_ms_std,forward_ms_mean,forward_ms_std,backward_ms_mean,backward_ms_std,optimizer_step_ms_mean,optimizer_step_ms_std,forward_pct,backward_pct,optimizer_step_pct
+4,C,244.96657288944215,0.371235334720488,42.9722854000837,0.004653205158246739,105.30066266503096,0.13441151575552435,95.95028461902119,0.23834708571089241,17.542101721559323,42.98572716390781,39.16872554784251
